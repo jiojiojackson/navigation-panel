@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>随机迷宫生成与自动寻路（动画）</title>
+<style>
+  :root{
+    --bg:#0f1724; --card:#0b1220; --accent:#60a5fa; --muted:#94a3b8; --good:#34d399; --bad:#fb7185;
+  }
+  body{
+    margin:0; font-family:Inter,ui-sans-serif,system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    background:linear-gradient(180deg,#071023 0%, #07182a 100%); color:#e6eef8;
+    min-height:100vh; display:flex; gap:20px; align-items:flex-start; padding:28px;
+  }
+  .panel{
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border:1px solid rgba(255,255,255,0.03); padding:14px; border-radius:12px; box-shadow: 0 6px 24px rgba(2,6,23,0.6);
+    width:360px;
+  }
+  h1{font-size:16px;margin:0 0 10px 0;color:var(--accent)}
+  label{display:block;font-size:13px;color:var(--muted);margin-top:10px}
+  select,input[type=number],input[type=range]{width:100%;padding:8px;margin-top:6px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:inherit}
+  .row{display:flex;gap:8px;margin-top:12px}
+  button{
+    flex:1;padding:10px;border-radius:10px;border:0;background:var(--accent);color:#04233b;font-weight:600;cursor:pointer;
+  }
+  button.secondary{background:#1f2937;color:var(--muted)}
+  canvas{border-radius:12px;background:#071428; box-shadow:0 8px 30px rgba(2,6,23,0.6)}
+  .meta{font-size:13px;color:var(--muted);margin-top:8px}
+  .small{font-size:12px;color:var(--muted)}
+  footer{margin-top:10px;font-size:12px;color:var(--muted)}
+  .hint{margin-top:8px;background:rgba(255,255,255,0.02);padding:8px;border-radius:8px;color:var(--muted)}
+</style>
+</head>
+<body>
+  <div class="panel">
+    <h1>迷宫生成与自动寻路</h1>
+    <label>生成算法
+      <select id="genAlgo">
+        <option value="recursive">递归回溯（Recursive Backtracker）</option>
+        <option value="prim">随机 Prim（Randomized Prim）</option>
+      </select>
+    </label>
+
+    <label>寻路算法
+      <select id="solveAlgo">
+        <option value="bfs">BFS（最短路径）</option>
+        <option value="dfs">DFS（非最短，演示探索）</option>
+        <option value="astar">A*（启发式，最优）</option>
+      </select>
+    </label>
+
+    <label>网格大小（行数与列数相同）</label>
+    <input type="number" id="gridSize" min="10" max="120" step="1" value="30">
+
+    <label>动画速度（越小越快，单位ms）</label>
+    <input type="range" id="speed" min="2" max="120" value="20">
+
+    <div class="row">
+      <button id="generateBtn">生成迷宫</button>
+      <button id="solveBtn" class="secondary">自动寻路</button>
+    </div>
+
+    <div class="row">
+      <button id="regenBtn" class="secondary">只重新绘制</button>
+      <button id="clearBtn" class="secondary">清除</button>
+    </div>
+
+    <div class="meta">起点：左上（绿色） · 终点：右下（红色）</div>
+    <div class="hint small">说明：BFS / A* 会展示最短路径。调整网格大小与速度后可重新生成。</div>
+    <footer>实现：Canvas + JS · 支持递归回溯与Prim生成；BFS/DFS/A*寻路并动画展示</footer>
+  </div>
+
+  <div style="flex:1; display:flex; flex-direction:column; gap:12px;">
+    <canvas id="canvas"></canvas>
+    <div style="display:flex;gap:12px;align-items:center;">
+      <div style="color:var(--muted);font-size:13px">探索色：绿，已访问：浅绿，路径：黄色 →</div>
+      <div id="status" style="color:var(--muted);font-size:13px">状态：就绪</div>
+    </div>
+  </div>
+
+<script>
+/*
+  Maze + Solvers with animation:
+  - Grid of cells, walls as top/right/bottom/left booleans
+  - Generation: recursive backtracker (DFS) & randomized Prim
+  - Solvers: BFS, DFS, A* (Manhattan)
+  - Animation: during solving, color explored cells; after found, animate path
+*/
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const genAlgoSel = document.getElementById('genAlgo');
+const solveAlgoSel = document.getElementById('solveAlgo');
+const gridSizeInput = document.getElementById('gridSize');
+const speedInput = document.getElementById('speed');
+const generateBtn = document.getElementById('generateBtn');
+const solveBtn = document.getElementById('solveBtn');
+const regenBtn = document.getElementById('regenBtn');
+const clearBtn = document.getElementById('clearBtn');
+const statusEl = document.getElementById('status');
+
+let rows = parseInt(gridSizeInput.value);
+let cols = rows;
+let cellSize = 20;
+let maze = []; // array rows x cols
+let running = false;
+let exploringColor = '#10b98166';  // 修改为绿色透明
+let visitedColor = '#10b98199';    // 修改为浅绿色
+let pathColor = '#fbbf24';
+let startCell = [0,0];
+let endCell = null;
+
+function resizeCanvas() {
+  // fit canvas to window width while keeping square grid
+  const maxWidth = Math.max(window.innerWidth - 420, 300);
+  const maxHeight = window.innerHeight - 100;
+  // compute cellSize to fit grid
+  cellSize = Math.floor(Math.min(maxWidth / cols, maxHeight / rows));
+  if (cellSize < 4) cellSize = 4;
+  canvas.width = cols * cellSize;
+  canvas.height = rows * cellSize;
+}
+window.addEventListener('resize', ()=> { resizeCanvas(); drawMaze(); });
+
+function initGrid(r,c){
+  rows = r; cols = c;
+  maze = new Array(rows);
+  for(let y=0;y<rows;y++){
+    maze[y] = new Array(cols);
+    for(let x=0;x<cols;x++){
+      maze[y][x] = {
+        x,y,
+        walls: {top:true,right:true,bottom:true,left:true},
+        visited:false
+      };
+    }
+  }
+  startCell = [0,0];
+  endCell = [cols-1, rows-1];
+}
+
+function drawMaze(highlightVisited=false){
+  if(!maze.length) return;
+  resizeCanvas();
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.lineWidth = Math.max(1, cellSize/12);
+  ctx.strokeStyle = '#0ea5e9';
+  ctx.fillStyle = '#071428';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  // draw cells: walls
+  for(let y=0;y<rows;y++){
+    for(let x=0;x<cols;x++){
+      const cell = maze[y][x];
+      const px = x*cellSize, py = y*cellSize;
+      ctx.beginPath();
+      if(cell.walls.top){
+        ctx.moveTo(px,py);
+        ctx.lineTo(px+cellSize,py);
+      }
+      if(cell.walls.right){
+        ctx.moveTo(px+cellSize,py);
+        ctx.lineTo(px+cellSize,py+cellSize);
+      }
+      if(cell.walls.bottom){
+        ctx.moveTo(px,py+cellSize);
+        ctx.lineTo(px+cellSize,py+cellSize);
+      }
+      if(cell.walls.left){
+        ctx.moveTo(px,py);
+        ctx.lineTo(px,py+cellSize);
+      }
+      ctx.stroke();
+      // optionally fill visited
+      if(highlightVisited && cell._vis){
+        ctx.fillStyle = visitedColor;
+        ctx.fillRect(px+1,py+1,cellSize-2,cellSize-2);
+      }
+    }
+  }
+
+  // start & end markers
+  const [sx,sy] = startCell;
+  const [ex,ey] = endCell;
+  // start
+  ctx.fillStyle = '#10b981';
+  ctx.fillRect(sx*cellSize+2, sy*cellSize+2, cellSize-4, cellSize-4);
+  // end
+  ctx.fillStyle = '#ef4444';
+  ctx.fillRect(ex*cellSize+2, ey*cellSize+2, cellSize-4, cellSize-4);
+}
+
+// Utilities
+function neighborsOf(x,y){
+  const n = [];
+  if(y>0) n.push(maze[y-1][x]); // top
+  if(x<cols-1) n.push(maze[y][x+1]); // right
+  if(y<rows-1) n.push(maze[y+1][x]); // bottom
+  if(x>0) n.push(maze[y][x-1]); // left
+  return n;
+}
+function randInt(n){ return Math.floor(Math.random()*n); }
+function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j=randInt(i+1); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
+
+// Carve wall between two adjacent cells
+function removeWall(a,b){
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  if(dx === 1){ a.walls.right = false; b.walls.left = false; }
+  else if(dx === -1){ a.walls.left = false; b.walls.right = false; }
+  else if(dy === 1){ a.walls.bottom = false; b.walls.top = false; }
+  else if(dy === -1){ a.walls.top = false; b.walls.bottom = false; }
+}
+
+// Maze generation algorithms
+
+// 1) Recursive Backtracker (iterative stack)
+function generateRecursive(){
+  initVisitedFlags();
+  const stack = [];
+  const start = maze[0][0];
+  start.visited = true;
+  stack.push(start);
+  while(stack.length){
+    const current = stack[stack.length-1];
+    const x = current.x, y = current.y;
+    const options = [];
+    // check neighbors not visited
+    if(y>0 && !maze[y-1][x].visited) options.push(maze[y-1][x]);
+    if(x<cols-1 && !maze[y][x+1].visited) options.push(maze[y][x+1]);
+    if(y<rows-1 && !maze[y+1][x].visited) options.push(maze[y+1][x]);
+    if(x>0 && !maze[y][x-1].visited) options.push(maze[y][x-1]);
+    if(options.length){
+      const next = options[randInt(options.length)];
+      removeWall(current, next);
+      next.visited = true;
+      stack.push(next);
+    } else {
+      stack.pop();
+    }
+  }
+}
+
+// 2) Randomized Prim's algorithm
+function generatePrim(){
+  initVisitedFlags();
+  const inMaze = (cell)=>cell._in;
+  // start with random cell
+  const sx = randInt(cols), sy = randInt(rows);
+  const start = maze[sy][sx];
+  start._in = true;
+  const frontier = [];
+  const addFrontier = (cell)=>{
+    const {x,y} = cell;
+    [[0,-1],[1,0],[0,1],[-1,0]].forEach(([dx,dy])=>{
+      const nx = x+dx, ny = y+dy;
+      if(nx>=0 && nx<cols && ny>=0 && ny<rows){
+        const n = maze[ny][nx];
+        if(!n._in){
+          // store as frontier if not already
+          if(!n._front) { n._front=true; frontier.push(n); }
+        }
+      }
+    });
+  };
+  addFrontier(start);
+  while(frontier.length){
+    const idx = randInt(frontier.length);
+    const cell = frontier.splice(idx,1)[0];
+    cell._front = false;
+    // choose random neighbor that is in maze
+    const candidates = neighborsOf(cell.x, cell.y).filter(n=>n._in);
+    if(candidates.length){
+      const neighbor = candidates[randInt(candidates.length)];
+      removeWall(cell, neighbor);
+      cell._in = true;
+      addFrontier(cell);
+    }
+  }
+}
+
+function initVisitedFlags(){
+  for(let y=0;y<rows;y++) for(let x=0;x<cols;x++){
+    maze[y][x].visited = false;
+    maze[y][x]._vis = false;
+    maze[y][x]._in = false;
+    maze[y][x]._front = false;
+  }
+}
+
+// Build adjacency list from maze walls
+function getNeighborsAvailable(node){
+  const {x,y} = node;
+  const out = [];
+  if(!node.walls.top && y>0) out.push(maze[y-1][x]);
+  if(!node.walls.right && x<cols-1) out.push(maze[y][x+1]);
+  if(!node.walls.bottom && y<rows-1) out.push(maze[y+1][x]);
+  if(!node.walls.left && x>0) out.push(maze[y][x-1]);
+  return out;
+}
+
+// Solvers with animation
+function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
+
+async function animateSolve(type){
+  if(running) return;
+  running = true;
+  disableControls(true);
+  statusEl.textContent = '状态：搜索中...';
+  // reset _vis flags
+  for(let y=0;y<rows;y++) for(let x=0;x<cols;x++) maze[y][x]._vis = false;
+
+  const start = maze[startCell[1]][startCell[0]];
+  const goal = maze[endCell[1]][endCell[0]];
+  let speed = Math.max(2, parseInt(speedInput.value));
+  let result = null;
+  if(type === 'bfs') result = await solveBFS(start, goal, speed);
+  else if(type === 'dfs') result = await solveDFS(start, goal, speed);
+  else if(type === 'astar') result = await solveAStar(start, goal, speed);
+
+  if(result && result.path){
+    statusEl.textContent = `状态：已找到路径（长度 ${result.path.length}）。正在展示最优路径...`;
+    await animatePath(result.path, speed);
+    statusEl.textContent = '状态：完成';
+  } else {
+    statusEl.textContent = '状态：未找到路径';
+  }
+
+  running = false;
+  disableControls(false);
+}
+
+// BFS (guarantees shortest path in unweighted grid)
+async function solveBFS(start,goal,speed){
+  const q = [];
+  const cameFrom = new Map();
+  q.push(start);
+  start._vis = true;
+  cameFrom.set(cellKey(start), null);
+
+  while(q.length){
+    const cur = q.shift();
+    // draw visit
+    cur._vis = true;
+    drawMaze(true);
+    drawCellFill(cur, exploringColor);
+    drawStartEnd();
+    await sleep(speed);
+
+    if(cur === goal) {
+      // reconstruct
+      const path = reconstructPath(cameFrom, cur);
+      return {path, explored:true};
+    }
+
+    const neigh = getNeighborsAvailable(cur);
+    for(const n of neigh){
+      if(!n._vis && !cameFrom.has(cellKey(n))){
+        cameFrom.set(cellKey(n), cur);
+        n._vis = false; // mark not yet visited but in cameFrom
+        q.push(n);
+      }
+    }
+  }
+  return null;
+}
+
+// DFS (demonstrative, may not find shortest)
+async function solveDFS(start,goal,speed){
+  const stack = [];
+  const cameFrom = new Map();
+  stack.push(start);
+  cameFrom.set(cellKey(start), null);
+  while(stack.length){
+    const cur = stack.pop();
+    if(cur._vis) continue;
+    cur._vis = true;
+    drawMaze(true);
+    drawCellFill(cur, exploringColor);
+    drawStartEnd();
+    await sleep(speed);
+
+    if(cur === goal){ const path = reconstructPath(cameFrom, cur); return {path}; }
+
+    const neigh = shuffle(getNeighborsAvailable(cur).slice());
+    for(const n of neigh){
+      if(!cameFrom.has(cellKey(n))){
+        cameFrom.set(cellKey(n), cur);
+        stack.push(n);
+      }
+    }
+  }
+  return null;
+}
+
+// A*
+async function solveAStar(start,goal,speed){
+  const open = new TinyHeap((a,b)=>a.f-b.f);
+  const gScore = new Map();
+  const fScore = new Map();
+  const cameFrom = new Map();
+  function setG(n, val){ gScore.set(cellKey(n), val); }
+  function getG(n){ return gScore.get(cellKey(n)) ?? Infinity; }
+  function setF(n,val){ fScore.set(cellKey(n), val); }
+  function getF(n){ return fScore.get(cellKey(n)) ?? Infinity; }
+
+  setG(start, 0);
+  setF(start, heuristic(start,goal));
+  open.push({node:start, f:getF(start)});
+  cameFrom.set(cellKey(start), null);
+
+  while(open.size()){
+    const curWrap = open.pop();
+    const cur = curWrap.node;
+    if(cur._vis) continue;
+    cur._vis = true;
+    drawMaze(true);
+    drawCellFill(cur, exploringColor);
+    drawStartEnd();
+    await sleep(speed);
+
+    if(cur === goal) {
+      const path = reconstructPath(cameFrom, cur);
+      return {path};
+    }
+
+    for(const n of getNeighborsAvailable(cur)){
+      const tentative = getG(cur) + 1;
+      if(tentative < getG(n)){
+        cameFrom.set(cellKey(n), cur);
+        setG(n, tentative);
+        setF(n, tentative + heuristic(n,goal));
+        open.push({node:n, f:getF(n)});
+      }
+    }
+  }
+  return null;
+}
+
+// helpers: tiny heap (min-heap)
+class TinyHeap {
+  constructor(cmp){ this.data=[]; this.cmp = cmp || ((a,b)=>a-b); }
+  size(){ return this.data.length; }
+  push(v){ this.data.push(v); this._siftUp(); }
+  pop(){ if(this.size()===0) return null; const top=this.data[0]; const end=this.data.pop(); if(this.size()){ this.data[0]=end; this._siftDown(); } return top; }
+  _siftUp(){ let idx=this.data.length-1; while(idx>0){ const p=Math.floor((idx-1)/2); if(this.cmp(this.data[idx], this.data[p]) < 0){ [this.data[idx],this.data[p]]=[this.data[p],this.data[idx]]; idx=p; } else break; } }
+  _siftDown(){ let idx=0; const len=this.data.length; while(true){ const l=2*idx+1, r=2*idx+2; let smallest=idx; if(l<len && this.cmp(this.data[l], this.data[smallest])<0) smallest=l; if(r<len && this.cmp(this.data[r], this.data[smallest])<0) smallest=r; if(smallest!==idx){ [this.data[idx],this.data[smallest]]=[this.data[smallest],this.data[idx]]; idx=smallest; } else break; } }
+}
+
+// reconstruct path using cameFrom map
+function reconstructPath(cameFrom, end){
+  const path = [];
+  let cur = end;
+  while(cur){
+    path.push(cur);
+    cur = cameFrom.get(cellKey(cur));
+  }
+  path.reverse();
+  return path;
+}
+
+async function animatePath(path, speed){
+  // 动画绘制线条
+  const step = Math.max(2, speed/2);
+  for(let i=1;i<path.length;i++){
+    drawMaze(true);
+    // 画探索过的
+    for(let y=0;y<rows;y++) for(let x=0;x<cols;x++){
+      if(maze[y][x]._vis) drawCellFill(maze[y][x], visitedColor);
+    }
+    // 画路径线
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = Math.max(2, cellSize/4);
+    ctx.beginPath();
+    ctx.moveTo(path[0].x*cellSize + cellSize/2, path[0].y*cellSize + cellSize/2);
+    for(let j=1;j<=i;j++){
+      ctx.lineTo(path[j].x*cellSize + cellSize/2, path[j].y*cellSize + cellSize/2);
+    }
+    ctx.stroke();
+
+    drawStartEnd();
+    await sleep(step);
+  }
+}
+
+
+function cellKey(cell){ return `${cell.x},${cell.y}`; }
+function heuristic(a,b){ return Math.abs(a.x - b.x) + Math.abs(a.y - b.y); }
+
+function drawCellFill(cell, color){
+  ctx.fillStyle = color;
+  ctx.fillRect(cell.x*cellSize+1, cell.y*cellSize+1, cellSize-2, cellSize-2);
+}
+function drawStartEnd(){
+  const [sx,sy] = startCell;
+  const [ex,ey] = endCell;
+  ctx.fillStyle = '#10b981';
+  ctx.fillRect(sx*cellSize+2, sy*cellSize+2, cellSize-4, cellSize-4);
+  ctx.fillStyle = '#ef4444';
+  ctx.fillRect(ex*cellSize+2, ey*cellSize+2, cellSize-4, cellSize-4);
+}
+
+// control helpers
+function disableControls(dis){
+  generateBtn.disabled = dis;
+  solveBtn.disabled = dis;
+  regenBtn.disabled = dis;
+  clearBtn.disabled = dis;
+  gridSizeInput.disabled = dis;
+  genAlgoSel.disabled = dis;
+  solveAlgoSel.disabled = dis;
+  speedInput.disabled = dis;
+}
+
+// Button events
+generateBtn.addEventListener('click', async ()=>{
+  if(running) return;
+  rows = cols = parseInt(gridSizeInput.value) || 30;
+  initGrid(rows, cols);
+  statusEl.textContent = '状态：生成中...';
+  disableControls(true);
+  await sleep(10);
+  const algo = genAlgoSel.value;
+  if(algo === 'recursive'){
+    generateRecursive();
+  } else {
+    generatePrim();
+  }
+  drawMaze();
+  statusEl.textContent = '状态：已生成迷宫';
+  disableControls(false);
+});
+
+solveBtn.addEventListener('click', async ()=>{
+  if(running) return;
+  const algo = solveAlgoSel.value;
+  await animateSolve(algo);
+});
+
+regenBtn.addEventListener('click', ()=>{
+  if(!maze.length) return;
+  drawMaze(true);
+  statusEl.textContent = '状态：重新绘制';
+});
+
+clearBtn.addEventListener('click', ()=>{
+  maze = [];
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  statusEl.textContent = '状态：已清空';
+});
+
+// initial setup
+(function(){
+  initGrid(rows,cols);
+  // quick default generation:
+  generateRecursive();
+  endCell = [cols-1, rows-1];
+  resizeCanvas();
+  drawMaze();
+})();
+</script>
+</body>
+</html>
