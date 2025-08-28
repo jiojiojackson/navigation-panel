@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CDN内容分发网络动画演示</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20vh 20px 20px;
+            color: #333;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        h1 {
+            text-align: center;
+            color: #764ba2;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .step-info {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea20 0%, #764ba220 100%);
+            border-radius: 10px;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+        }
+
+        .step-title {
+            font-size: 1.3em;
+            color: #667eea;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .step-description {
+            font-size: 1em;
+            color: #555;
+            line-height: 1.5;
+        }
+
+        .demo-area {
+            position: relative;
+            height: 500px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            overflow: hidden;
+            box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .origin-server {
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            border-radius: 10px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 12px;
+            box-shadow: 0 4px 15px rgba(245, 87, 108, 0.4);
+            z-index: 10;
+        }
+
+        .cdn-node {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 10px;
+            opacity: 0;
+            transition: all 0.5s ease;
+            box-shadow: 0 4px 15px rgba(79, 172, 254, 0.4);
+        }
+
+        .cdn-node.active {
+            opacity: 1;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .user {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            opacity: 0;
+            transition: all 0.5s ease;
+            box-shadow: 0 4px 15px rgba(250, 112, 154, 0.4);
+        }
+
+        .user.active {
+            opacity: 1;
+        }
+
+        .data-packet {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: linear-gradient(45deg, #f093fb 0%, #f5576c 100%);
+            border-radius: 3px;
+            opacity: 0;
+            z-index: 20;
+            box-shadow: 0 2px 10px rgba(240, 147, 251, 0.5);
+        }
+
+        .data-packet.active {
+            opacity: 1;
+        }
+
+        .connection-line {
+            position: absolute;
+            background: linear-gradient(90deg, transparent, #667eea, transparent);
+            height: 2px;
+            opacity: 0;
+            transform-origin: left center;
+            transition: opacity 0.5s ease;
+        }
+
+        .connection-line.active {
+            opacity: 0.6;
+            animation: flow 2s infinite;
+        }
+
+        @keyframes flow {
+            0% { background-position: -100px; }
+            100% { background-position: 100px; }
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 12px 30px;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-next {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-next:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(118, 75, 162, 0.4);
+        }
+
+        .btn-reset {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+
+        .btn-reset:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(245, 87, 108, 0.4);
+        }
+
+        .btn-auto {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+
+        .btn-auto:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(79, 172, 254, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 12px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .legend-icon {
+            width: 20px;
+            height: 20px;
+            margin-right: 8px;
+            border-radius: 3px;
+        }
+
+        .cache-indicator {
+            position: absolute;
+            background: #28a745;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 20px;
+            font-size: 10px;
+            font-weight: bold;
+            opacity: 0;
+            transition: all 0.5s ease;
+        }
+
+        .cache-indicator.active {
+            opacity: 1;
+            animation: fadeInOut 2s ease;
+        }
+
+        @keyframes fadeInOut {
+            0%, 100% { opacity: 0; }
+            50% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌐 CDN内容分发网络演示</h1>
+        
+        <div class="step-info">
+            <div class="step-title" id="stepTitle">准备开始</div>
+            <div class="step-description" id="stepDescription">
+                点击"下一步"按钮开始演示CDN的工作原理
+            </div>
+        </div>
+
+        <div class="demo-area" id="demoArea">
+            <div class="origin-server" id="originServer">源服务器</div>
+            
+            <!-- CDN节点 -->
+            <div class="cdn-node" id="cdn1" style="top: 20%; left: 20%;">CDN-1</div>
+            <div class="cdn-node" id="cdn2" style="top: 20%; left: 80%;">CDN-2</div>
+            <div class="cdn-node" id="cdn3" style="top: 80%; left: 20%;">CDN-3</div>
+            <div class="cdn-node" id="cdn4" style="top: 80%; left: 80%;">CDN-4</div>
+            
+            <!-- 用户 -->
+            <div class="user" id="user1" style="top: 10%; left: 5%;">👤</div>
+            <div class="user" id="user2" style="top: 10%; left: 90%;">👤</div>
+            <div class="user" id="user3" style="top: 90%; left: 5%;">👤</div>
+            <div class="user" id="user4" style="top: 90%; left: 90%;">👤</div>
+            
+            <!-- 连接线 -->
+            <div class="connection-line" id="line1"></div>
+            <div class="connection-line" id="line2"></div>
+            <div class="connection-line" id="line3"></div>
+            <div class="connection-line" id="line4"></div>
+            
+            <!-- 数据包 -->
+            <div class="data-packet" id="packet1"></div>
+            <div class="data-packet" id="packet2"></div>
+            
+            <!-- 缓存指示器 -->
+            <div class="cache-indicator" id="cacheIndicator">已缓存 ✓</div>
+            
+            <!-- 图例 -->
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);"></div>
+                    <span>源服务器</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); border-radius: 50%;"></div>
+                    <span>CDN节点</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); border-radius: 50%;"></div>
+                    <span>用户</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn-next" id="nextBtn" onclick="nextStep()">下一步 ▶</button>
+            <button class="btn-reset" id="resetBtn" onclick="resetDemo()">重置演示 ↺</button>
+            <button class="btn-auto" id="autoBtn" onclick="autoPlay()">自动播放 ▷</button>
+        </div>
+    </div>
+
+    <script>
+        let currentStep = 0;
+        let isAutoPlaying = false;
+        let autoPlayInterval = null;
+
+        const steps = [
+            {
+                title: "步骤 1: 部署CDN节点",
+                description: "CDN在全球各地部署多个边缘服务器节点，形成分布式网络",
+                action: () => {
+                    document.querySelectorAll('.cdn-node').forEach((node, index) => {
+                        setTimeout(() => {
+                            node.classList.add('active');
+                        }, index * 200);
+                    });
+                }
+            },
+            {
+                title: "步骤 2: 用户发起请求",
+                description: "世界各地的用户访问网站，请求内容（如图片、视频、CSS、JS文件）",
+                action: () => {
+                    document.querySelectorAll('.user').forEach((user, index) => {
+                        setTimeout(() => {
+                            user.classList.add('active');
+                        }, index * 150);
+                    });
+                }
+            },
+            {
+                title: "步骤 3: 智能DNS解析",
+                description: "CDN的智能DNS系统将用户请求路由到最近的CDN节点",
+                action: () => {
+                    drawConnectionLines();
+                }
+            },
+            {
+                title: "步骤 4: 首次请求 - 回源",
+                description: "如果CDN节点没有缓存，会向源服务器请求内容（回源）",
+                action: () => {
+                    animateDataTransfer('originServer', 'cdn1', 'packet1', () => {
+                        showCacheIndicator('cdn1');
+                    });
+                }
+            },
+            {
+                title: "步骤 5: 内容缓存",
+                description: "CDN节点缓存内容，为后续请求做准备",
+                action: () => {
+                    document.querySelectorAll('.cdn-node').forEach(node => {
+                        showCacheIndicator(node.id);
+                    });
+                }
+            },
+            {
+                title: "步骤 6: 快速响应",
+                description: "后续用户请求直接从最近的CDN节点获取缓存内容，大幅提升访问速度",
+                action: () => {
+                    animateDataTransfer('cdn2', 'user2', 'packet2', () => {
+                        setTimeout(() => {
+                            animateDataTransfer('cdn1', 'user1', 'packet1');
+                        }, 500);
+                    });
+                }
+            },
+            {
+                title: "演示完成",
+                description: "CDN通过分布式缓存和就近访问，显著提升了网站性能和用户体验",
+                action: () => {
+                    celebrateCompletion();
+                }
+            }
+        ];
+
+        function nextStep() {
+            if (currentStep < steps.length) {
+                const step = steps[currentStep];
+                document.getElementById('stepTitle').textContent = step.title;
+                document.getElementById('stepDescription').textContent = step.description;
+                step.action();
+                currentStep++;
+                
+                if (currentStep >= steps.length) {
+                    document.getElementById('nextBtn').disabled = true;
+                    stopAutoPlay();
+                }
+            }
+        }
+
+        function resetDemo() {
+            currentStep = 0;
+            stopAutoPlay();
+            
+            // 清除所有动画类
+            document.querySelectorAll('.cdn-node, .user, .connection-line, .data-packet, .cache-indicator').forEach(el => {
+                el.classList.remove('active');
+            });
+            
+            // 重置连接线
+            document.querySelectorAll('.connection-line').forEach(line => {
+                line.style.width = '0';
+            });
+            
+            // 重置信息
+            document.getElementById('stepTitle').textContent = '准备开始';
+            document.getElementById('stepDescription').textContent = '点击"下一步"按钮开始演示CDN的工作原理';
+            
+            // 重新启用按钮
+            document.getElementById('nextBtn').disabled = false;
+        }
+
+        function autoPlay() {
+            if (isAutoPlaying) {
+                stopAutoPlay();
+            } else {
+                isAutoPlaying = true;
+                document.getElementById('autoBtn').textContent = '停止播放 ◼';
+                
+                // 如果已经完成，先重置
+                if (currentStep >= steps.length) {
+                    resetDemo();
+                }
+                
+                // 立即执行第一步
+                nextStep();
+                
+                // 自动执行后续步骤
+                autoPlayInterval = setInterval(() => {
+                    if (currentStep < steps.length) {
+                        nextStep();
+                    } else {
+                        stopAutoPlay();
+                    }
+                }, 3000);
+            }
+        }
+
+        function stopAutoPlay() {
+            isAutoPlaying = false;
+            document.getElementById('autoBtn').textContent = '自动播放 ▷';
+            if (autoPlayInterval) {
+                clearInterval(autoPlayInterval);
+                autoPlayInterval = null;
+            }
+        }
+
+        function drawConnectionLines() {
+            const connections = [
+                { from: 'user1', to: 'cdn1', line: 'line1' },
+                { from: 'user2', to: 'cdn2', line: 'line2' },
+                { from: 'user3', to: 'cdn3', line: 'line3' },
+                { from: 'user4', to: 'cdn4', line: 'line4' }
+            ];
+            
+            connections.forEach((conn, index) => {
+                setTimeout(() => {
+                    drawLine(conn.from, conn.to, conn.line);
+                }, index * 200);
+            });
+        }
+
+        function drawLine(fromId, toId, lineId) {
+            const from = document.getElementById(fromId);
+            const to = document.getElementById(toId);
+            const line = document.getElementById(lineId);
+            
+            const fromRect = from.getBoundingClientRect();
+            const toRect = to.getBoundingClientRect();
+            const containerRect = document.getElementById('demoArea').getBoundingClientRect();
+            
+            const x1 = fromRect.left + fromRect.width / 2 - containerRect.left;
+            const y1 = fromRect.top + fromRect.height / 2 - containerRect.top;
+            const x2 = toRect.left + toRect.width / 2 - containerRect.left;
+            const y2 = toRect.top + toRect.height / 2 - containerRect.top;
+            
+            const distance = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+            const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+            
+            line.style.width = distance + 'px';
+            line.style.left = x1 + 'px';
+            line.style.top = y1 + 'px';
+            line.style.transform = `rotate(${angle}deg)`;
+            line.classList.add('active');
+        }
+
+        function animateDataTransfer(fromId, toId, packetId, callback) {
+            const from = document.getElementById(fromId);
+            const to = document.getElementById(toId);
+            const packet = document.getElementById(packetId);
+            
+            const fromRect = from.getBoundingClientRect();
+            const toRect = to.getBoundingClientRect();
+            const containerRect = document.getElementById('demoArea').getBoundingClientRect();
+            
+            const x1 = fromRect.left + fromRect.width / 2 - containerRect.left - 10;
+            const y1 = fromRect.top + fromRect.height / 2 - containerRect.top - 10;
+            const x2 = toRect.left + toRect.width / 2 - containerRect.left - 10;
+            const y2 = toRect.top + toRect.height / 2 - containerRect.top - 10;
+            
+            packet.style.left = x1 + 'px';
+            packet.style.top = y1 + 'px';
+            packet.classList.add('active');
+            
+            packet.style.transition = 'all 1.5s ease';
+            
+            setTimeout(() => {
+                packet.style.left = x2 + 'px';
+                packet.style.top = y2 + 'px';
+            }, 100);
+            
+            setTimeout(() => {
+                packet.classList.remove('active');
+                if (callback) callback();
+            }, 1600);
+        }
+
+        function showCacheIndicator(nodeId) {
+            const node = document.getElementById(nodeId);
+            const indicator = document.getElementById('cacheIndicator');
+            const nodeRect = node.getBoundingClientRect();
+            const containerRect = document.getElementById('demoArea').getBoundingClientRect();
+            
+            indicator.style.left = (nodeRect.left - containerRect.left + nodeRect.width / 2 - 30) + 'px';
+            indicator.style.top = (nodeRect.top - containerRect.top - 25) + 'px';
+            indicator.classList.add('active');
+            
+            setTimeout(() => {
+                indicator.classList.remove('active');
+            }, 2000);
+        }
+
+        function celebrateCompletion() {
+            document.querySelectorAll('.cdn-node, .user').forEach((el, index) => {
+                setTimeout(() => {
+                    el.style.animation = 'pulse 1s ease';
+                    setTimeout(() => {
+                        el.style.animation = '';
+                    }, 1000);
+                }, index * 100);
+            });
+        }
+
+        // 键盘快捷键支持
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') {
+                if (!document.getElementById('nextBtn').disabled) {
+                    nextStep();
+                }
+            } else if (e.key === 'r' || e.key === 'R') {
+                resetDemo();
+            } else if (e.key === 'a' || e.key === 'A') {
+                autoPlay();
+            }
+        });
+    </script>
+</body>
+</html>
