@@ -3,593 +3,487 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CDN内容分发网络动画演示</title>
+    <title>CDN 工作原理演示</title>
+    <!-- 引入 Tailwind CSS CDN，用于快速造型 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Google Fonts - Inter 字体，提升可读性 -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        * {
+        /* 全局样式设置，使用 Inter 字体和浅色背景 */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* 浅蓝灰色背景 */
+            color: #333;
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 20vh 20px 20px;
-            color: #333;
-        }
-
+        /* 主容器样式，居中显示，带有圆角和阴影 */
         .container {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            padding: 40px;
             max-width: 1200px;
-            width: 100%;
+            margin: 2rem auto;
+            padding: 1.5rem;
+            background-color: #fff;
+            border-radius: 1rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            /* 响应式调整边距 */
+            @media (max-width: 768px) {
+                margin: 1rem;
+                padding: 1rem;
+            }
         }
-
-        h1 {
-            text-align: center;
-            color: #764ba2;
-            margin-bottom: 10px;
-            font-size: 2.5em;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
-        }
-
-        .step-info {
-            text-align: center;
-            margin-bottom: 30px;
-            padding: 15px;
-            background: linear-gradient(135deg, #667eea20 0%, #764ba220 100%);
-            border-radius: 10px;
-            min-height: 80px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-        }
-
-        .step-title {
-            font-size: 1.3em;
-            color: #667eea;
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-
-        .step-description {
-            font-size: 1em;
-            color: #555;
-            line-height: 1.5;
-        }
-
-        .demo-area {
+        /* 动画区域样式，相对定位，用于放置可动元素 */
+        .animation-area {
             position: relative;
-            height: 500px;
-            background: #f8f9fa;
-            border-radius: 15px;
-            margin-bottom: 30px;
-            overflow: hidden;
-            box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.1);
+            min-height: 500px;
+            background-color: #e2e8f0; /* 更浅的蓝灰色作为动画背景 */
+            border-radius: 0.75rem;
+            overflow: hidden; /* 隐藏超出边界的线条/圆点 */
+            /* 响应式调整高度 */
+            @media (max-width: 768px) {
+                min-height: 350px;
+            }
         }
-
-        .origin-server {
+        /* 动画元素（用户、服务器、CDN节点）的通用样式 */
+        .element {
             position: absolute;
-            width: 80px;
-            height: 80px;
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            border-radius: 10px;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
+            background-color: #4f46e5; /* 靛蓝色 */
+            color: #fff;
+            padding: 0.75rem 1.25rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            text-align: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: all 0.5s ease-in-out; /* 平滑过渡效果 */
             display: flex;
             align-items: center;
             justify-content: center;
-            color: white;
-            font-weight: bold;
-            font-size: 12px;
-            box-shadow: 0 4px 15px rgba(245, 87, 108, 0.4);
-            z-index: 10;
+            white-space: nowrap; /* 防止文字换行 */
+            /* 响应式调整字体大小和填充 */
+            @media (max-width: 768px) {
+                font-size: 0.875rem; /* text-sm */
+                padding: 0.5rem 0.8rem;
+            }
         }
+        /* 各个元素的特定位置和颜色 */
+        .element.user { top: 70%; left: 5%; background-color: #10b981; } /* 用户 (绿色) */
+        .element.origin { top: 10%; left: 45%; background-color: #ef4444; } /* 原始服务器 (红色) */
+        .element.cdn-node-1 { top: 40%; left: 20%; background-color: #f97316; } /* CDN节点 A (橙色) */
+        .element.cdn-node-2 { top: 40%; left: 70%; background-color: #06b6d4; } /* CDN节点 B (青色) */
+        .element.cdn-node-3 { top: 70%; left: 80%; background-color: #a855f7; } /* CDN节点 C (紫色) */
 
-        .cdn-node {
+        /* 连接线的样式 */
+        .line {
             position: absolute;
-            width: 60px;
-            height: 60px;
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: bold;
-            font-size: 10px;
-            opacity: 0;
-            transition: all 0.5s ease;
-            box-shadow: 0 4px 15px rgba(79, 172, 254, 0.4);
+            border-top: 2px dashed #94a3b8; /* 石板灰色虚线 */
+            transform-origin: 0 0; /* 旋转中心点 */
+            display: none; /* 默认隐藏 */
+            opacity: 0; /* 默认透明 */
+            transition: opacity 0.5s ease-in-out; /* 透明度过渡 */
         }
-
-        .cdn-node.active {
-            opacity: 1;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-        }
-
-        .user {
+        /* 动画圆点样式，代表数据流 */
+        .dot {
             position: absolute;
-            width: 50px;
-            height: 50px;
-            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            opacity: 0;
-            transition: all 0.5s ease;
-            box-shadow: 0 4px 15px rgba(250, 112, 154, 0.4);
+            width: 10px;
+            height: 10px;
+            background-color: #4f46e5; /* 靛蓝色 */
+            border-radius: 50%; /* 圆形 */
+            display: none; /* 默认隐藏 */
+            opacity: 0; /* 默认透明 */
         }
 
-        .user.active {
-            opacity: 1;
+        /* 关键帧动画，用于圆点沿路径移动 */
+        @keyframes moveDot {
+            from { transform: translate(0, 0); } /* 从起点开始 */
+            to { transform: translate(var(--travel-x), var(--travel-y)); } /* 移动到指定偏移量 */
         }
 
-        .data-packet {
-            position: absolute;
-            width: 20px;
-            height: 20px;
-            background: linear-gradient(45deg, #f093fb 0%, #f5576c 100%);
-            border-radius: 3px;
-            opacity: 0;
-            z-index: 20;
-            box-shadow: 0 2px 10px rgba(240, 147, 251, 0.5);
-        }
-
-        .data-packet.active {
-            opacity: 1;
-        }
-
-        .connection-line {
-            position: absolute;
-            background: linear-gradient(90deg, transparent, #667eea, transparent);
-            height: 2px;
-            opacity: 0;
-            transform-origin: left center;
-            transition: opacity 0.5s ease;
-        }
-
-        .connection-line.active {
-            opacity: 0.6;
-            animation: flow 2s infinite;
-        }
-
-        @keyframes flow {
-            0% { background-position: -100px; }
-            100% { background-position: 100px; }
-        }
-
-        .controls {
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-            flex-wrap: wrap;
-        }
-
-        button {
-            padding: 12px 30px;
-            font-size: 16px;
-            font-weight: bold;
-            border: none;
-            border-radius: 50px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-        }
-
-        .btn-next {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-
-        .btn-next:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(118, 75, 162, 0.4);
-        }
-
-        .btn-reset {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            color: white;
-        }
-
-        .btn-reset:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(245, 87, 108, 0.4);
-        }
-
-        .btn-auto {
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-            color: white;
-        }
-
-        .btn-auto:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(79, 172, 254, 0.4);
-        }
-
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none !important;
-        }
-
-        .legend {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 15px;
-            border-radius: 10px;
-            font-size: 12px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
-
-        .legend-item {
-            display: flex;
-            align-items: center;
-            margin-bottom: 8px;
-        }
-
-        .legend-icon {
-            width: 20px;
-            height: 20px;
-            margin-right: 8px;
-            border-radius: 3px;
-        }
-
-        .cache-indicator {
-            position: absolute;
-            background: #28a745;
-            color: white;
-            padding: 4px 8px;
-            border-radius: 20px;
-            font-size: 10px;
-            font-weight: bold;
-            opacity: 0;
-            transition: all 0.5s ease;
-        }
-
-        .cache-indicator.active {
-            opacity: 1;
-            animation: fadeInOut 2s ease;
-        }
-
-        @keyframes fadeInOut {
-            0%, 100% { opacity: 0; }
-            50% { opacity: 1; }
+        /* 用于显示元素的辅助类 */
+        .fade-in {
+            opacity: 1 !important;
+            display: block !important;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🌐 CDN内容分发网络演示</h1>
-        
-        <div class="step-info">
-            <div class="step-title" id="stepTitle">准备开始</div>
-            <div class="step-description" id="stepDescription">
-                点击"下一步"按钮开始演示CDN的工作原理
-            </div>
+        <h1 class="text-3xl font-bold text-center mb-6 text-gray-800">内容分发网络（CDN）工作原理动画演示</h1>
+
+        <div id="animationArea" class="animation-area mb-8 p-4">
+            <!-- 动画元素：用户、原始服务器和CDN节点 -->
+            <div id="user" class="element user z-10">用户 (您)</div>
+            <div id="origin" class="element origin z-10">原始服务器</div>
+            <div id="cdn1" class="element cdn-node-1 z-10 hidden">CDN节点 A</div>
+            <div id="cdn2" class="element cdn-node-2 z-10 hidden">CDN节点 B</div>
+            <div id="cdn3" class="element cdn-node-3 z-10 hidden">CDN节点 C</div>
+
+            <!-- 数据流的线条和圆点，使用 z-index 控制层级 -->
+            <div id="line-user-origin" class="line z-[1]"></div>
+            <div id="dot-user-origin" class="dot z-[2]"></div>
+
+            <div id="line-origin-cdn1" class="line z-[1]"></div>
+            <div id="dot-origin-cdn1" class="dot z-[2]"></div>
+            <div id="line-cdn1-user" class="line z-[1]"></div>
+            <div id="dot-cdn1-user" class="dot z-[2]"></div>
+
+            <div id="line-user-cdn1-request" class="line z-[1]"></div>
+            <div id="dot-user-cdn1-request" class="dot z-[2]"></div>
         </div>
 
-        <div class="demo-area" id="demoArea">
-            <div class="origin-server" id="originServer">源服务器</div>
-            
-            <!-- CDN节点 -->
-            <div class="cdn-node" id="cdn1" style="top: 20%; left: 20%;">CDN-1</div>
-            <div class="cdn-node" id="cdn2" style="top: 20%; left: 80%;">CDN-2</div>
-            <div class="cdn-node" id="cdn3" style="top: 80%; left: 20%;">CDN-3</div>
-            <div class="cdn-node" id="cdn4" style="top: 80%; left: 80%;">CDN-4</div>
-            
-            <!-- 用户 -->
-            <div class="user" id="user1" style="top: 10%; left: 5%;">👤</div>
-            <div class="user" id="user2" style="top: 10%; left: 90%;">👤</div>
-            <div class="user" id="user3" style="top: 90%; left: 5%;">👤</div>
-            <div class="user" id="user4" style="top: 90%; left: 90%;">👤</div>
-            
-            <!-- 连接线 -->
-            <div class="connection-line" id="line1"></div>
-            <div class="connection-line" id="line2"></div>
-            <div class="connection-line" id="line3"></div>
-            <div class="connection-line" id="line4"></div>
-            
-            <!-- 数据包 -->
-            <div class="data-packet" id="packet1"></div>
-            <div class="data-packet" id="packet2"></div>
-            
-            <!-- 缓存指示器 -->
-            <div class="cache-indicator" id="cacheIndicator">已缓存 ✓</div>
-            
-            <!-- 图例 -->
-            <div class="legend">
-                <div class="legend-item">
-                    <div class="legend-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);"></div>
-                    <span>源服务器</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); border-radius: 50%;"></div>
-                    <span>CDN节点</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-icon" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); border-radius: 50%;"></div>
-                    <span>用户</span>
-                </div>
-            </div>
+        <!-- 步骤描述区域 -->
+        <div id="description" class="bg-blue-100 text-blue-800 p-4 rounded-lg mb-6 shadow-inner text-lg">
+            <p>欢迎来到CDN工作原理演示！点击“下一步”开始。</p>
         </div>
 
-        <div class="controls">
-            <button class="btn-next" id="nextBtn" onclick="nextStep()">下一步 ▶</button>
-            <button class="btn-reset" id="resetBtn" onclick="resetDemo()">重置演示 ↺</button>
-            <button class="btn-auto" id="autoBtn" onclick="autoPlay()">自动播放 ▷</button>
+        <!-- 控制按钮区域 -->
+        <div class="flex flex-wrap justify-center gap-4">
+            <button id="nextBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition duration-300 transform hover:scale-105">
+                下一步
+            </button>
+            <button id="resetBtn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg shadow-md transition duration-300 transform hover:scale-105">
+                重置
+            </button>
+            <button id="autoPlayBtn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg shadow-md transition duration-300 transform hover:scale-105">
+                自动播放
+            </button>
+            <button id="pauseAutoPlayBtn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg shadow-md transition duration-300 transform hover:scale-105 hidden">
+                暂停自动播放
+            </button>
         </div>
     </div>
 
     <script>
-        let currentStep = 0;
-        let isAutoPlaying = false;
-        let autoPlayInterval = null;
+        // 获取动画所需的HTML元素
+        const userEl = document.getElementById('user');
+        const originEl = document.getElementById('origin');
+        const cdn1El = document.getElementById('cdn1');
+        const cdn2El = document.getElementById('cdn2');
+        const cdn3El = document.getElementById('cdn3');
 
+        const animationArea = document.getElementById('animationArea');
+        const descriptionEl = document.getElementById('description');
+        const nextBtn = document.getElementById('nextBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const autoPlayBtn = document.getElementById('autoPlayBtn');
+        const pauseAutoPlayBtn = document.getElementById('pauseAutoPlayBtn');
+
+        let currentStep = 0; // 当前动画步骤索引
+        let autoPlayInterval = null; // 自动播放的计时器ID
+        let animationTimeout = null; // 单个动画（如圆点移动）的计时器ID
+
+        /**
+         * 获取元素相对于动画区域的位置（中心点）
+         * @param {HTMLElement} el - HTML元素
+         * @returns {{x: number, y: number}} - 元素的中心点坐标
+         */
+        function getElementPos(el) {
+            const rect = el.getBoundingClientRect();
+            const containerRect = animationArea.getBoundingClientRect();
+            return {
+                x: rect.left + rect.width / 2 - containerRect.left,
+                y: rect.top + rect.height / 2 - containerRect.top
+            };
+        }
+
+        /**
+         * 绘制静态线条，连接两个元素
+         * @param {HTMLElement} lineEl - 线条元素
+         * @param {HTMLElement} startEl - 起始元素
+         * @param {HTMLElement} endEl - 结束元素
+         */
+        function drawLinePath(lineEl, startEl, endEl) {
+            const start = getElementPos(startEl);
+            const end = getElementPos(endEl);
+
+            const dx = end.x - start.x;
+            const dy = end.y - start.y;
+            const length = Math.sqrt(dx * dx + dy * dy);
+            const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+
+            lineEl.style.width = `${length}px`;
+            lineEl.style.left = `${start.x}px`;
+            lineEl.style.top = `${start.y}px`;
+            lineEl.style.transform = `rotate(${angle}deg)`;
+        }
+
+        /**
+         * 动画圆点沿线条移动
+         * @param {HTMLElement} dotEl - 圆点元素
+         * @param {HTMLElement} startEl - 起始元素
+         * @param {HTMLElement} endEl - 结束元素
+         * @param {number} duration - 动画持续时间（秒）
+         * @param {function} callback - 动画完成后的回调函数
+         * @returns {Promise<void>} - 返回一个Promise，动画完成后resolve
+         */
+        function animateDot(dotEl, startEl, endEl, duration = 1.5, callback = () => {}) {
+            return new Promise(resolve => {
+                const start = getElementPos(startEl);
+                const end = getElementPos(endEl);
+
+                const dx = end.x - start.x;
+                const dy = end.y - start.y;
+
+                dotEl.style.left = `${start.x}px`;
+                dotEl.style.top = `${start.y}px`;
+                dotEl.style.opacity = '1';
+                dotEl.style.display = 'block';
+                dotEl.style.animation = 'none'; // 清除之前的动画
+
+                // 强制浏览器重排，以确保动画从头开始
+                void dotEl.offsetWidth;
+
+                // 设置CSS变量，供 @keyframes moveDot 使用
+                dotEl.style.setProperty('--travel-x', `${dx}px`);
+                dotEl.style.setProperty('--travel-y', `${dy}px`);
+                dotEl.style.animation = `moveDot ${duration}s linear forwards`;
+
+                // 动画完成后隐藏圆点，并执行回调和resolve Promise
+                animationTimeout = setTimeout(() => {
+                    dotEl.style.display = 'none';
+                    dotEl.style.opacity = '0';
+                    dotEl.style.animation = 'none';
+                    callback();
+                    resolve();
+                }, duration * 1000);
+            });
+        }
+
+        /**
+         * 隐藏所有线条和圆点，并清除所有动画
+         */
+        function hideAllLinesAndDots() {
+            document.querySelectorAll('.line').forEach(el => {
+                el.style.display = 'none';
+                el.style.opacity = '0';
+            });
+            document.querySelectorAll('.dot').forEach(el => {
+                el.style.display = 'none';
+                el.style.opacity = '0';
+                el.style.animation = 'none'; // 停止所有圆点动画
+            });
+            // 确保清除可能存在的单个动画计时器
+            if (animationTimeout) {
+                clearTimeout(animationTimeout);
+                animationTimeout = null;
+            }
+        }
+
+        // 动画步骤定义
         const steps = [
             {
-                title: "步骤 1: 部署CDN节点",
-                description: "CDN在全球各地部署多个边缘服务器节点，形成分布式网络",
+                description: "欢迎来到CDN工作原理演示！内容分发网络（CDN）旨在加速互联网内容的交付。点击“下一步”开始。",
                 action: () => {
-                    document.querySelectorAll('.cdn-node').forEach((node, index) => {
-                        setTimeout(() => {
-                            node.classList.add('active');
-                        }, index * 200);
+                    // 初始化状态：只显示用户和原始服务器
+                    hideAllLinesAndDots();
+                    userEl.classList.remove('hidden');
+                    originEl.classList.remove('hidden');
+                    cdn1El.classList.add('hidden');
+                    cdn2El.classList.add('hidden');
+                    cdn3El.classList.add('hidden');
+                    return Promise.resolve(); // 返回一个已解决的Promise
+                }
+            },
+            {
+                description: "<b>第一步：没有CDN (传统访问)</b><br>用户直接从遥远的“原始服务器”请求内容。数据传输路径长，加载速度慢。",
+                action: async () => {
+                    hideAllLinesAndDots();
+                    const lineEl = document.getElementById('line-user-origin');
+                    lineEl.style.display = 'block';
+                    lineEl.style.opacity = '1';
+                    drawLinePath(lineEl, userEl, originEl); // 绘制静态连接线
+                    await animateDot(document.getElementById('dot-user-origin'), userEl, originEl, 3); // 动画圆点沿线移动
+                }
+            },
+            {
+                description: "<b>第二步：引入CDN</b><br>CDN在全球各地部署了大量服务器节点（缓存服务器），它们会缓存网站内容，让用户可以从更近的地点获取数据。",
+                action: () => {
+                    hideAllLinesAndDots();
+                    cdn1El.classList.remove('hidden');
+                    cdn2El.classList.remove('hidden');
+                    cdn3El.classList.remove('hidden');
+                    // CDN节点短暂放大，表示出现/激活
+                    [cdn1El, cdn2El, cdn3El].forEach(el => {
+                        el.style.transform = 'scale(1.1)';
+                        setTimeout(() => el.style.transform = 'scale(1)', 300);
                     });
+                    return Promise.resolve();
                 }
             },
             {
-                title: "步骤 2: 用户发起请求",
-                description: "世界各地的用户访问网站，请求内容（如图片、视频、CSS、JS文件）",
+                description: "<b>第三步：有CDN (首次请求)</b><br>用户请求内容，请求首先被导向离用户最近的CDN节点（此处为CDN节点A）。如果CDN节点没有缓存内容，它会先从原始服务器获取，然后缓存并发送给用户。",
+                action: async () => {
+                    hideAllLinesAndDots();
+
+                    // 1. 用户向最近的CDN节点发送请求
+                    const userCdnLineReq = document.getElementById('line-user-cdn1-request');
+                    userCdnLineReq.style.display = 'block';
+                    userCdnLineReq.style.opacity = '1';
+                    drawLinePath(userCdnLineReq, userEl, cdn1El);
+                    await animateDot(document.getElementById('dot-user-cdn1-request'), userEl, cdn1El, 1.5);
+                    hideAllLinesAndDots(); // 清除当前圆点动画
+
+                    // 2. CDN节点从原始服务器获取内容
+                    const cdnOriginLine = document.getElementById('line-origin-cdn1');
+                    cdnOriginLine.style.display = 'block';
+                    cdnOriginLine.style.opacity = '1';
+                    drawLinePath(cdnOriginLine, cdn1El, originEl); // 从CDN到原始服务器
+                    cdn1El.style.backgroundColor = '#facc15'; // 改变CDN节点颜色表示正在获取
+                    await animateDot(document.getElementById('dot-origin-cdn1'), cdn1El, originEl, 2);
+                    cdn1El.style.backgroundColor = '#f97316'; // 恢复CDN节点颜色
+                    hideAllLinesAndDots(); // 清除当前圆点动画
+
+                    // 3. CDN节点将内容发送给用户（并缓存）
+                    const cdnUserLine = document.getElementById('line-cdn1-user');
+                    cdnUserLine.style.display = 'block';
+                    cdnUserLine.style.opacity = '1';
+                    drawLinePath(cdnUserLine, cdn1El, userEl);
+                    await animateDot(document.getElementById('dot-cdn1-user'), cdn1El, userEl, 1.5);
+                }
+            },
+            {
+                description: "<b>第四步：有CDN (后续请求)</b><br>当同一用户或附近的其他用户再次请求相同内容时，CDN节点会直接从其缓存中提供，无需再访问原始服务器，速度极快！",
+                action: async () => {
+                    hideAllLinesAndDots();
+
+                    // 1. 用户向最近的CDN节点发送请求
+                    const userCdnLineReq = document.getElementById('line-user-cdn1-request');
+                    userCdnLineReq.style.display = 'block';
+                    userCdnLineReq.style.opacity = '1';
+                    drawLinePath(userCdnLineReq, userEl, cdn1El);
+                    await animateDot(document.getElementById('dot-user-cdn1-request'), userEl, cdn1El, 1.5);
+                    hideAllLinesAndDots(); // 清除当前圆点动画
+
+                    // 2. CDN节点直接从缓存提供内容（无需访问原始服务器）
+                    cdn1El.style.transform = 'scale(1.1)'; // CDN节点短暂放大表示从缓存提供
+                    await new Promise(resolve => setTimeout(() => {
+                        cdn1El.style.transform = 'scale(1)';
+                        resolve();
+                    }, 500));
+
+                    // 3. CDN节点将内容发送给用户
+                    const cdnUserLine = document.getElementById('line-cdn1-user');
+                    cdnUserLine.style.display = 'block';
+                    cdnUserLine.style.opacity = '1';
+                    drawLinePath(cdnUserLine, cdn1El, userEl);
+                    await animateDot(document.getElementById('dot-cdn1-user'), cdn1El, userEl, 1.5);
+                }
+            },
+            {
+                description: "<b>总结：CDN的优势</b><br>CDN极大地缩短了用户获取内容的距离，提高了网站加载速度，减轻了原始服务器的压力，提升了用户体验和系统稳定性。",
                 action: () => {
-                    document.querySelectorAll('.user').forEach((user, index) => {
-                        setTimeout(() => {
-                            user.classList.add('active');
-                        }, index * 150);
+                    hideAllLinesAndDots();
+                    // 所有元素短暂放大，表示CDN的整体优势
+                    [userEl, originEl, cdn1El, cdn2El, cdn3El].forEach(el => {
+                        el.style.transform = 'scale(1.05)';
+                        setTimeout(() => el.style.transform = 'scale(1)', 500);
                     });
-                }
-            },
-            {
-                title: "步骤 3: 智能DNS解析",
-                description: "CDN的智能DNS系统将用户请求路由到最近的CDN节点",
-                action: () => {
-                    drawConnectionLines();
-                }
-            },
-            {
-                title: "步骤 4: 首次请求 - 回源",
-                description: "如果CDN节点没有缓存，会向源服务器请求内容（回源）",
-                action: () => {
-                    animateDataTransfer('originServer', 'cdn1', 'packet1', () => {
-                        showCacheIndicator('cdn1');
-                    });
-                }
-            },
-            {
-                title: "步骤 5: 内容缓存",
-                description: "CDN节点缓存内容，为后续请求做准备",
-                action: () => {
-                    document.querySelectorAll('.cdn-node').forEach(node => {
-                        showCacheIndicator(node.id);
-                    });
-                }
-            },
-            {
-                title: "步骤 6: 快速响应",
-                description: "后续用户请求直接从最近的CDN节点获取缓存内容，大幅提升访问速度",
-                action: () => {
-                    animateDataTransfer('cdn2', 'user2', 'packet2', () => {
-                        setTimeout(() => {
-                            animateDataTransfer('cdn1', 'user1', 'packet1');
-                        }, 500);
-                    });
-                }
-            },
-            {
-                title: "演示完成",
-                description: "CDN通过分布式缓存和就近访问，显著提升了网站性能和用户体验",
-                action: () => {
-                    celebrateCompletion();
+                    return Promise.resolve();
                 }
             }
         ];
 
-        function nextStep() {
-            if (currentStep < steps.length) {
-                const step = steps[currentStep];
-                document.getElementById('stepTitle').textContent = step.title;
-                document.getElementById('stepDescription').textContent = step.description;
-                step.action();
-                currentStep++;
-                
-                if (currentStep >= steps.length) {
-                    document.getElementById('nextBtn').disabled = true;
-                    stopAutoPlay();
-                }
+        /**
+         * 推进到下一个动画步骤
+         */
+        async function nextStep() {
+            // 清除任何可能正在进行的单个动画计时器
+            if (animationTimeout) {
+                clearTimeout(animationTimeout);
+                animationTimeout = null;
             }
-        }
 
-        function resetDemo() {
-            currentStep = 0;
-            stopAutoPlay();
-            
-            // 清除所有动画类
-            document.querySelectorAll('.cdn-node, .user, .connection-line, .data-packet, .cache-indicator').forEach(el => {
-                el.classList.remove('active');
-            });
-            
-            // 重置连接线
-            document.querySelectorAll('.connection-line').forEach(line => {
-                line.style.width = '0';
-            });
-            
-            // 重置信息
-            document.getElementById('stepTitle').textContent = '准备开始';
-            document.getElementById('stepDescription').textContent = '点击"下一步"按钮开始演示CDN的工作原理';
-            
-            // 重新启用按钮
-            document.getElementById('nextBtn').disabled = false;
-        }
+            // 清除当前屏幕上所有的线条和圆点动画效果
+            hideAllLinesAndDots();
 
-        function autoPlay() {
-            if (isAutoPlaying) {
-                stopAutoPlay();
-            } else {
-                isAutoPlaying = true;
-                document.getElementById('autoBtn').textContent = '停止播放 ◼';
-                
-                // 如果已经完成，先重置
-                if (currentStep >= steps.length) {
-                    resetDemo();
-                }
-                
-                // 立即执行第一步
-                nextStep();
-                
-                // 自动执行后续步骤
-                autoPlayInterval = setInterval(() => {
-                    if (currentStep < steps.length) {
-                        nextStep();
-                    } else {
-                        stopAutoPlay();
-                    }
-                }, 3000);
+            currentStep = (currentStep + 1);
+            if (currentStep >= steps.length) {
+                 currentStep = 0; // 循环回到第一个步骤
             }
+            descriptionEl.innerHTML = steps[currentStep].description; // 更新步骤描述
+            await steps[currentStep].action(); // 执行当前步骤的动画，等待其完成
+            return Promise.resolve();
         }
 
-        function stopAutoPlay() {
-            isAutoPlaying = false;
-            document.getElementById('autoBtn').textContent = '自动播放 ▷';
+        /**
+         * 重置动画到初始状态
+         */
+        function resetAnimation() {
+            currentStep = 0; // 回到第一步
+            // 如果自动播放正在进行，则停止它
             if (autoPlayInterval) {
-                clearInterval(autoPlayInterval);
+                clearTimeout(autoPlayInterval);
+                autoPlayInterval = null;
+                autoPlayBtn.classList.remove('hidden');
+                pauseAutoPlayBtn.classList.add('hidden');
+            }
+            // 清除所有动画和元素状态
+            hideAllLinesAndDots();
+
+            // 将元素重置为初始步骤（步骤0）的状态
+            userEl.classList.remove('hidden');
+            originEl.classList.remove('hidden');
+            cdn1El.classList.add('hidden');
+            cdn2El.classList.add('hidden');
+            cdn3El.classList.add('hidden');
+            descriptionEl.innerHTML = steps[0].description; // 显示第一步描述
+        }
+
+        /**
+         * 开始自动播放动画
+         */
+        async function startAutoPlay() {
+            if (autoPlayInterval) return; // 如果已经在自动播放，则不执行
+
+            autoPlayBtn.classList.add('hidden');
+            pauseAutoPlayBtn.classList.remove('hidden');
+
+            const playLoop = async () => {
+                await nextStep(); // 执行下一个步骤并等待其动画完成
+                // 在当前步骤动画完成后，设置延迟以开始下一个步骤
+                autoPlayInterval = setTimeout(playLoop, 5000); // 每5秒切换一次步骤
+            };
+            await playLoop(); // 立即开始第一轮自动播放
+        }
+
+        /**
+         * 暂停自动播放动画
+         */
+        function pauseAutoPlay() {
+            if (autoPlayInterval) {
+                clearTimeout(autoPlayInterval); // 清除下一个步骤的计时器
                 autoPlayInterval = null;
             }
+            autoPlayBtn.classList.remove('hidden');
+            pauseAutoPlayBtn.classList.add('hidden');
         }
 
-        function drawConnectionLines() {
-            const connections = [
-                { from: 'user1', to: 'cdn1', line: 'line1' },
-                { from: 'user2', to: 'cdn2', line: 'line2' },
-                { from: 'user3', to: 'cdn3', line: 'line3' },
-                { from: 'user4', to: 'cdn4', line: 'line4' }
-            ];
-            
-            connections.forEach((conn, index) => {
-                setTimeout(() => {
-                    drawLine(conn.from, conn.to, conn.line);
-                }, index * 200);
-            });
-        }
+        // 绑定按钮事件监听器
+        nextBtn.addEventListener('click', nextStep);
+        resetBtn.addEventListener('click', resetAnimation);
+        autoPlayBtn.addEventListener('click', startAutoPlay);
+        pauseAutoPlayBtn.addEventListener('click', pauseAutoPlay);
 
-        function drawLine(fromId, toId, lineId) {
-            const from = document.getElementById(fromId);
-            const to = document.getElementById(toId);
-            const line = document.getElementById(lineId);
-            
-            const fromRect = from.getBoundingClientRect();
-            const toRect = to.getBoundingClientRect();
-            const containerRect = document.getElementById('demoArea').getBoundingClientRect();
-            
-            const x1 = fromRect.left + fromRect.width / 2 - containerRect.left;
-            const y1 = fromRect.top + fromRect.height / 2 - containerRect.top;
-            const x2 = toRect.left + toRect.width / 2 - containerRect.left;
-            const y2 = toRect.top + toRect.height / 2 - containerRect.top;
-            
-            const distance = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
-            const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
-            
-            line.style.width = distance + 'px';
-            line.style.left = x1 + 'px';
-            line.style.top = y1 + 'px';
-            line.style.transform = `rotate(${angle}deg)`;
-            line.classList.add('active');
-        }
+        // 页面加载完成后执行初始化
+        window.onload = () => {
+            resetAnimation(); // 重置到初始状态并显示第一步描述
+        };
 
-        function animateDataTransfer(fromId, toId, packetId, callback) {
-            const from = document.getElementById(fromId);
-            const to = document.getElementById(toId);
-            const packet = document.getElementById(packetId);
-            
-            const fromRect = from.getBoundingClientRect();
-            const toRect = to.getBoundingClientRect();
-            const containerRect = document.getElementById('demoArea').getBoundingClientRect();
-            
-            const x1 = fromRect.left + fromRect.width / 2 - containerRect.left - 10;
-            const y1 = fromRect.top + fromRect.height / 2 - containerRect.top - 10;
-            const x2 = toRect.left + toRect.width / 2 - containerRect.left - 10;
-            const y2 = toRect.top + toRect.height / 2 - containerRect.top - 10;
-            
-            packet.style.left = x1 + 'px';
-            packet.style.top = y1 + 'px';
-            packet.classList.add('active');
-            
-            packet.style.transition = 'all 1.5s ease';
-            
-            setTimeout(() => {
-                packet.style.left = x2 + 'px';
-                packet.style.top = y2 + 'px';
-            }, 100);
-            
-            setTimeout(() => {
-                packet.classList.remove('active');
-                if (callback) callback();
-            }, 1600);
-        }
-
-        function showCacheIndicator(nodeId) {
-            const node = document.getElementById(nodeId);
-            const indicator = document.getElementById('cacheIndicator');
-            const nodeRect = node.getBoundingClientRect();
-            const containerRect = document.getElementById('demoArea').getBoundingClientRect();
-            
-            indicator.style.left = (nodeRect.left - containerRect.left + nodeRect.width / 2 - 30) + 'px';
-            indicator.style.top = (nodeRect.top - containerRect.top - 25) + 'px';
-            indicator.classList.add('active');
-            
-            setTimeout(() => {
-                indicator.classList.remove('active');
-            }, 2000);
-        }
-
-        function celebrateCompletion() {
-            document.querySelectorAll('.cdn-node, .user').forEach((el, index) => {
-                setTimeout(() => {
-                    el.style.animation = 'pulse 1s ease';
-                    setTimeout(() => {
-                        el.style.animation = '';
-                    }, 1000);
-                }, index * 100);
-            });
-        }
-
-        // 键盘快捷键支持
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'ArrowRight' || e.key === ' ') {
-                if (!document.getElementById('nextBtn').disabled) {
-                    nextStep();
+        // 窗口大小调整时，重新绘制可见线条的位置，以适应新的布局
+        window.addEventListener('resize', () => {
+            document.querySelectorAll('.line').forEach(lineEl => {
+                // 如果线条是可见的，则重新计算并绘制其路径
+                if (lineEl.style.display !== 'none' && lineEl.style.opacity !== '0') {
+                    const idParts = lineEl.id.split('-');
+                    // 根据ID解析出起始和结束元素的ID
+                    const startElId = idParts[1];
+                    const endElId = idParts[2];
+                    const startEl = document.getElementById(startElId);
+                    const endEl = document.getElementById(endElId);
+                    if (startEl && endEl) {
+                       drawLinePath(lineEl, startEl, endEl);
+                    }
                 }
-            } else if (e.key === 'r' || e.key === 'R') {
-                resetDemo();
-            } else if (e.key === 'a' || e.key === 'A') {
-                autoPlay();
-            }
+            });
         });
     </script>
 </body>
